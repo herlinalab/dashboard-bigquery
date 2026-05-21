@@ -278,3 +278,258 @@ f"p-value : {result.p:.4f}"
 st.write(
 f"Tau : {result.Tau:.4f}"
 )
+
+# ======================
+# POLA MUSIMAN
+# ======================
+
+st.subheader("Pola Musiman Curah Hujan")
+
+sql_musiman=f"""
+SELECT
+EXTRACT(MONTH FROM event_date) AS bulan,
+
+FORMAT_DATE(
+'%b',
+DATE(
+2024,
+CAST(EXTRACT(MONTH FROM event_date) AS INT64),
+1
+)
+) AS nama_bulan,
+
+ROUND(
+AVG(rainfall_mm),2
+) AS rata_rata
+
+FROM {FULL_TABLE}
+
+WHERE rainfall_mm>=0
+
+GROUP BY bulan,nama_bulan
+ORDER BY bulan
+"""
+
+df_musiman=run_query(
+sql_musiman
+)
+
+sql_heatmap=f"""
+SELECT
+
+EXTRACT(MONTH FROM event_date) AS bulan,
+
+EXTRACT(YEAR FROM event_date) AS tahun,
+
+ROUND(
+AVG(rainfall_mm),
+2
+) AS rata_rata
+
+FROM {FULL_TABLE}
+
+WHERE rainfall_mm>=0
+
+GROUP BY bulan,tahun
+ORDER BY bulan,tahun
+"""
+
+df_heatmap=run_query(
+sql_heatmap
+)
+
+col1,col2=st.columns(2)
+
+with col1:
+
+    fig,ax=plt.subplots(
+    figsize=(8,4)
+    )
+
+    ax.bar(
+        df_musiman["nama_bulan"],
+        df_musiman["rata_rata"]
+    )
+
+    ax.set_title(
+    "Rata-rata Curah Hujan per Bulan"
+    )
+
+    ax.tick_params(
+        axis='x',
+        rotation=45
+    )
+
+    st.pyplot(fig)
+
+
+with col2:
+
+    pivot=df_heatmap.pivot(
+        index='bulan',
+        columns='tahun',
+        values='rata_rata'
+    )
+
+    fig,ax=plt.subplots(
+    figsize=(8,4)
+    )
+
+    sns.heatmap(
+        pivot,
+        annot=True,
+        fmt=".0f",
+        cmap="YlOrRd",
+        ax=ax
+    )
+
+    ax.set_title(
+    "Heatmap Curah Hujan"
+    )
+
+    st.pyplot(fig)
+
+
+# ======================
+# TOP WILAYAH BERDASARKAN JUMLAH KEJADIAN
+# ======================
+
+st.subheader(
+"Top 10 Wilayah Berdasarkan Jumlah Kejadian"
+)
+
+query_top=f"""
+SELECT
+
+district_city,
+
+COUNT(*)
+AS total_kejadian
+
+FROM {FULL_TABLE}
+
+GROUP BY district_city
+
+ORDER BY total_kejadian DESC
+
+LIMIT 10
+"""
+
+top_wilayah=run_query(
+query_top
+)
+
+fig,ax=plt.subplots(
+figsize=(10,5)
+)
+
+sns.barplot(
+data=top_wilayah,
+x='total_kejadian',
+y='district_city',
+ax=ax
+)
+
+st.pyplot(fig)
+
+
+# ======================
+# TREN PER WILAYAH
+# ======================
+
+st.subheader(
+"Tren Curah Hujan per Wilayah"
+)
+
+sql_tren_wil=f"""
+
+WITH top_wilayah AS(
+
+SELECT
+INITCAP(
+TRIM(district_city)
+) wilayah
+
+FROM {FULL_TABLE}
+
+GROUP BY wilayah
+
+ORDER BY COUNT(*) DESC
+
+LIMIT 10
+)
+
+SELECT
+
+DATE_TRUNC(
+event_date,
+MONTH
+) AS bulan_dt,
+
+INITCAP(
+TRIM(t.district_city)
+) wilayah,
+
+ROUND(
+AVG(
+t.rainfall_mm
+),
+2
+) AS rata_curah_hujan
+
+FROM {FULL_TABLE} t
+
+JOIN top_wilayah tw
+
+ON INITCAP(
+TRIM(
+t.district_city
+)
+)=tw.wilayah
+
+GROUP BY
+bulan_dt,
+wilayah
+
+ORDER BY
+bulan_dt,
+wilayah
+"""
+
+df_tren_wil=run_query(
+sql_tren_wil
+)
+
+df_tren_wil[
+"bulan_dt"
+]=pd.to_datetime(
+df_tren_wil[
+"bulan_dt"
+]
+)
+
+fig,ax=plt.subplots(
+figsize=(14,6)
+)
+
+for wilayah,data in df_tren_wil.groupby(
+'wilayah'
+):
+
+    ax.plot(
+        data['bulan_dt'],
+        data['rata_curah_hujan'],
+        label=wilayah
+    )
+
+ax.legend(
+bbox_to_anchor=(1.02,1)
+)
+
+ax.xaxis.set_major_formatter(
+mdates.DateFormatter(
+'%b\n%Y'
+)
+)
+
+st.pyplot(fig)
