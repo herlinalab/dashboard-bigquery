@@ -219,7 +219,7 @@ def apply_light_style(fig, ax):
 
 PROJECT_ID   = "st-project-488506"
 DATASET_NAME = "uas_adbc"
-TABLE_NAME   = "dataset_bersih"
+TABLE_NAME   = "dataset_clean"
 FULL_TABLE   = f"`{PROJECT_ID}.{DATASET_NAME}.{TABLE_NAME}`"
 
 
